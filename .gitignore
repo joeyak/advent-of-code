@@ -27,3 +27,4 @@ go.work.sum
 # advent of code
 input*.txt
 output*.txt
+debug*.txt

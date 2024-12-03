@@ -16,11 +16,11 @@ import (
 var input string
 
 func main() {
-	for _, f := range []func() (any, error){Part1, Part2} {
+	for _, f := range []func() (any, string, error){Part1, Part2} {
 		funcName := strings.Split(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), ".")[1]
 
 		start := time.Now()
-		result, err := f()
+		result, debug, err := f()
 		duration := time.Since(start)
 
 		if err != nil {
@@ -41,14 +41,27 @@ func main() {
 			break
 		}
 
+		debugFile, err := os.OpenFile(fmt.Sprintf("debug-%s.txt", funcName), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0777)
+		if err != nil {
+			slog.Error("could not create or append debug file", "err", err)
+			os.Exit(1)
+		}
+		defer debugFile.Close()
+
+		_, err = debugFile.WriteString(debug)
+		if err != nil {
+			slog.Error("could not write debug", "func", funcName, "err", err)
+			break
+		}
+
 		slog.Info("finished running part", "func", funcName, "duration", duration, "result", result)
 	}
 }
 
-func Part1() (any, error) {
-	return "", nil
+func Part1() (any, string, error) {
+	return "", "", nil
 }
 
-func Part2() (any, error) {
-	return "", nil
+func Part2() (any, string, error) {
+	return "", "", nil
 }
