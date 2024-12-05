@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,8 +93,34 @@ func Part1(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
-	for _, line := range iterLines(input) {
-		_ = line
+	maxes := map[string]int{
+		"red":   12,
+		"green": 13,
+		"blue":  14,
+	}
+
+	for gameNum, line := range iterLines(input) {
+		gameNum++
+		success := true
+		for _, set := range strings.Split(strings.Split(line, ":")[1], ";") {
+			for _, cube := range strings.Split(set, ",") {
+				parts := strings.Split(strings.TrimSpace(cube), " ")
+				num, _ := strconv.Atoi(parts[0])
+				if num > maxes[parts[1]] {
+					success = false
+					break
+				}
+			}
+			if !success {
+				break
+			}
+		}
+
+		if success {
+			result += gameNum
+		}
+
+		debug += fmt.Sprintf("%d %t\n", gameNum, success)
 	}
 
 	return result, debug, nil
@@ -103,8 +130,30 @@ func Part2(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
-	for _, line := range iterLines(input) {
-		_ = line
+	for gameNum, line := range iterLines(input) {
+		gameNum += 1
+		maxes := map[string]int{
+			"red":   0,
+			"green": 0,
+			"blue":  0,
+		}
+		for _, set := range strings.Split(strings.Split(line, ":")[1], ";") {
+			for _, cube := range strings.Split(set, ",") {
+				parts := strings.Split(strings.TrimSpace(cube), " ")
+				num, _ := strconv.Atoi(parts[0])
+				if num > maxes[parts[1]] {
+					maxes[parts[1]] = num
+				}
+			}
+		}
+
+		gameResult := 1
+		for _, num := range maxes {
+			gameResult *= num
+		}
+
+		result += gameResult
+		debug += fmt.Sprintf("%d +%d => %d\n", gameNum, gameResult, result)
 	}
 
 	return result, debug, nil
