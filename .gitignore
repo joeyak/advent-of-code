@@ -24,7 +24,10 @@ go.work.sum
 # env file
 .env
 
-# advent of code
+# custom
+.vscode/
 input*.txt
 output*.txt
 debug*.txt
+.session
+inputs/
