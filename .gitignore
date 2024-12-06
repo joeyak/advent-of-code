@@ -28,3 +28,4 @@ go.work.sum
 input*.txt
 output*.txt
 debug*.txt
+.vscode/
