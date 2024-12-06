@@ -13,10 +13,18 @@ import (
 	_ "embed"
 )
 
+var verboseDebug bool
+
+const (
+	VisualizeStart = "==========VISUALIZE==========\n"
+	VisualizeStep  = "==========STEP==========\n"
+)
+
 func main() {
 	var inputPath, partFilter string
 	flag.StringVar(&inputPath, "input", "input.txt", "")
 	flag.StringVar(&partFilter, "part", "", "")
+	flag.BoolVar(&verboseDebug, "v", false, "verbose debug")
 	flag.Parse()
 
 	inputData, err := os.ReadFile(inputPath)
@@ -25,6 +33,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	input := strings.TrimSuffix(strings.ReplaceAll(string(inputData), "\r\n", "\n"), "\n")
+
 	for _, f := range []func(string) (any, string, error){Part1, Part2} {
 		funcName := strings.Split(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), ".")[1]
 		if !strings.HasSuffix(funcName, partFilter) {
@@ -32,7 +42,7 @@ func main() {
 		}
 
 		start := time.Now()
-		result, debug, err := f(string(inputData))
+		result, debug, err := f(input)
 		duration := time.Since(start)
 
 		if err != nil {
@@ -72,22 +82,11 @@ func main() {
 	}
 }
 
-func iterLines(input string) func(func(int, string) bool) {
-	return func(yield func(int, string) bool) {
-		lines := strings.Split(strings.ReplaceAll(input, "\r\n", "\n"), "\n")
-		for i := 0; i < len(lines); i++ {
-			if !yield(i, lines[i]) {
-				return
-			}
-		}
-	}
-}
-
 func Part1(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
-	for _, line := range iterLines(input) {
+	for _, line := range strings.Split(input, "\n") {
 		_ = line
 	}
 
@@ -98,7 +97,7 @@ func Part2(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
-	for _, line := range iterLines(input) {
+	for _, line := range strings.Split(input, "\n") {
 		_ = line
 	}
 
