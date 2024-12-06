@@ -7,6 +7,8 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -87,8 +89,47 @@ func Part1(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
+	inRules := true
+	pageRules := map[string][]string{}
 	for _, line := range iterLines(input) {
-		_ = line
+		if line == "" {
+			inRules = false
+			for k, v := range pageRules {
+				debug += fmt.Sprintf("%v: %v\n", k, v)
+			}
+			debug += "\n"
+			continue
+		}
+
+		if inRules {
+			parts := strings.Split(line, "|")
+			pageRules[parts[1]] = append(pageRules[parts[1]], parts[0])
+		} else {
+			valid := true
+			pages := strings.Split(line, ",")
+			for i, page := range pages {
+				rules := pageRules[page]
+				for _, rule := range rules {
+					if slices.Contains(pages[i+1:], rule) {
+						valid = false
+						break
+					}
+				}
+
+				if !valid {
+					break
+				}
+			}
+
+			debug += fmt.Sprintf("%v", pages)
+			if valid {
+				middle, _ := strconv.Atoi(pages[len(pages)/2])
+				result += middle
+
+				debug += fmt.Sprintf(" +%d => %d", middle, result)
+			}
+			debug += "\n"
+		}
 	}
 
 	return result, debug, nil
@@ -98,9 +139,70 @@ func Part2(input string) (any, string, error) {
 	result := 0
 	debug := ""
 
+	inRules := true
+	pageRules := map[string][]string{}
+	var failedUpdates [][]string
 	for _, line := range iterLines(input) {
-		_ = line
+		if line == "" {
+			inRules = false
+			for k, v := range pageRules {
+				debug += fmt.Sprintf("%v: %v\n", k, v)
+			}
+			debug += "\n"
+			continue
+		}
+
+		if inRules {
+			parts := strings.Split(line, "|")
+			pageRules[parts[1]] = append(pageRules[parts[1]], parts[0])
+		} else {
+			valid := true
+			update := strings.Split(line, ",")
+			for i, page := range update {
+				rules := pageRules[page]
+				for _, rule := range rules {
+					if slices.Contains(update[i+1:], rule) {
+						valid = false
+						break
+					}
+				}
+
+				if !valid {
+					break
+				}
+			}
+
+			debug += fmt.Sprintf("%v %t\n", update, valid)
+			if !valid {
+				failedUpdates = append(failedUpdates, update)
+			}
+		}
+	}
+
+	debug += "\n"
+	for _, update := range failedUpdates {
+		newUpdate := pt2FixOrder(update, pageRules)
+
+		middle, _ := strconv.Atoi(newUpdate[len(newUpdate)/2])
+		result += middle
+
+		debug += fmt.Sprintf("%v => %v +%d = %d\n", update, newUpdate, middle, result)
 	}
 
 	return result, debug, nil
+}
+
+func pt2FixOrder(update []string, rules map[string][]string) []string {
+	update = slices.Clone(update)
+	slices.SortStableFunc(update, func(a, b string) int {
+		rule, ok := rules[a]
+		if !ok {
+			return 0
+		}
+		if slices.Contains(rule, b) {
+			return 1
+		}
+		return -1
+	})
+	return update
 }
