@@ -17,8 +17,8 @@ import (
 const VisualizeStep = "==========STEP==========\n"
 
 var (
-	verboseDebug    bool
-	DirectionChange = map[string]string{
+	verboseDebug, veryVerboseDebug bool
+	DirectionChange                = map[string]string{
 		"^": ">",
 		">": "V",
 		"V": "<",
@@ -37,6 +37,7 @@ func main() {
 	flag.StringVar(&inputPath, "input", "input.txt", "")
 	flag.StringVar(&partFilter, "part", "", "")
 	flag.BoolVar(&verboseDebug, "v", false, "verbose debug")
+	flag.BoolVar(&veryVerboseDebug, "vv", false, "very verbose debug")
 	flag.Parse()
 
 	// inputPath = "input-example-1.txt"
@@ -133,7 +134,7 @@ func Part1(input string) (any, string, error) {
 			slog.Info("out of bounds", "func", "Part1", "step", state.Step, "X", state.Guard.Pos.X, "Y", state.Guard.Pos.Y)
 			break
 		}
-		if verboseDebug {
+		if (verboseDebug && (state.Width == 10 || (state.Width > 10 && state.Step%25 == 0))) || veryVerboseDebug {
 			debug += VisualizeStep + state.Debug()
 		}
 
@@ -179,6 +180,30 @@ func Part1(input string) (any, string, error) {
 func Part2(input string) (any, string, error) {
 	result := 0
 	debug := ""
+
+	var state State
+	for i, r := range input {
+		x := i - (state.Height * (state.Width + 1))
+
+		switch r {
+		case '\n':
+			if state.Width == 0 {
+				state.Width = i
+			}
+			state.Height++
+		case '^', 'V', '<', '>':
+			state.Guard = Guard{
+				Pos: Pos{X: x, Y: state.Height},
+				Dir: string(r),
+			}
+		case '#':
+			state.Obstacles = append(state.Obstacles, Pos{X: x, Y: state.Height})
+		}
+	}
+	state.Height++
+
+	b, _ := json.MarshalIndent(state, "", "    ")
+	debug += string(b) + "\n"
 
 	return result, debug, nil
 }
