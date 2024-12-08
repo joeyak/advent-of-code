@@ -18,17 +18,12 @@ const VisualizeStep = "==========STEP==========\n"
 
 func main() {
 	var args struct {
-		Year             int           `arg:"positional,required"`
-		Day              int           `arg:"positional,required"`
 		Part             int           `arg:"positional" default:"1"`
 		AutoPlay         bool          `arg:"-a"`
 		DebugHeat        bool          `arg:"-h"`
 		AutoPlayDuration time.Duration `arg:"-d" default:"500ms"`
 	}
 	arg.MustParse(&args)
-
-	dir := fmt.Sprintf("../%d/day%d", args.Year, args.Day)
-	// dir = `E:\code\github\joeyak\advent-of-code\2024\day6`
 	// args.Part = 1
 
 	model := Model{
@@ -38,7 +33,7 @@ func main() {
 		DebugHeat:   args.DebugHeat,
 	}
 
-	debugData, err := os.ReadFile(fmt.Sprintf("%s/debug-Part%d.txt", dir, args.Part))
+	debugData, err := os.ReadFile(fmt.Sprintf("../debug-Part%d.txt", args.Part))
 	if err != nil {
 		slog.Error("could not read debug file", "err", err)
 		os.Exit(1)
