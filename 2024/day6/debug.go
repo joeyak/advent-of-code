@@ -3,8 +3,61 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/exec"
 )
+
+const (
+	AnsiColorReset = "\033[m"
+
+	AnsiColorDarkBlack   = "\033[0;30m"
+	AnsiColorDarkRed     = "\033[0;31m"
+	AnsiColorDarkGreen   = "\033[0;32m"
+	AnsiColorDarkYellow  = "\033[0;33m"
+	AnsiColorDarkBlue    = "\033[0;34m"
+	AnsiColorDarkMagenta = "\033[0;35m"
+	AnsiColorDarkCyan    = "\033[0;36m"
+	AnsiColorDarkWhite   = "\033[0;37m"
+
+	AnsiColorBlack   = "\033[0;90m"
+	AnsiColorRed     = "\033[0;91m"
+	AnsiColorGreen   = "\033[0;92m"
+	AnsiColorYellow  = "\033[0;93m"
+	AnsiColorBlue    = "\033[0;94m"
+	AnsiColorMagenta = "\033[0;95m"
+	AnsiColorCyan    = "\033[0;96m"
+	AnsiColorWhite   = "\033[0;97m"
+)
+
+var AnsiCodes = []string{
+	AnsiColorReset,
+	AnsiColorDarkBlack,
+	AnsiColorDarkRed,
+	AnsiColorDarkGreen,
+	AnsiColorDarkYellow,
+	AnsiColorDarkBlue,
+	AnsiColorDarkMagenta,
+	AnsiColorDarkCyan,
+	AnsiColorDarkWhite,
+	AnsiColorBlack,
+	AnsiColorRed,
+	AnsiColorGreen,
+	AnsiColorYellow,
+	AnsiColorBlue,
+	AnsiColorMagenta,
+	AnsiColorCyan,
+	AnsiColorWhite,
+}
+
+func clearScreen() {
+	cmd := exec.Command("cmd", "/c", "cls")
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		slog.Error("could not clear screen", "err", err)
+	}
+}
 
 type Debugger struct {
 	builder    bytes.Buffer
@@ -43,9 +96,9 @@ func (d *Debugger) WriteString(s string) {
 	}
 }
 
-func (d *Debugger) WriteFormat(format string, a ...any) {
+func (d *Debugger) WriteFunc(f func() string) {
 	if d.active {
-		_, err := d.builder.WriteString(fmt.Sprintf(format, a...))
+		_, err := d.builder.WriteString(f())
 		if err != nil {
 			panic(fmt.Errorf("could not write formatted string to debug builder: %w", err))
 		}
@@ -59,7 +112,6 @@ func (d *Debugger) writeIfOverTooLarge() {
 		if err != nil {
 			panic(fmt.Errorf("could not write periodic data to file: %w", err))
 		}
-		d.builder.Reset()
 	}
 }
 
@@ -90,7 +142,12 @@ func (d *Debugger) write(osFlags int) error {
 	}
 	defer file.Close()
 
-	_, err = file.Write(d.builder.Bytes())
+	data := d.builder.Bytes()
+	for _, code := range AnsiCodes {
+		data = bytes.ReplaceAll(data, []byte(code), nil)
+	}
+
+	_, err = file.Write(data)
 	if err != nil {
 		return fmt.Errorf("could not write to file: %w", err)
 	}
