@@ -13,14 +13,8 @@ import (
 	_ "embed"
 )
 
-var verboseDebug bool
-
-const (
-	VisualizeStart = "==========VISUALIZE==========\n"
-	VisualizeStep  = "==========STEP==========\n"
-)
-
 func main() {
+	var verboseDebug bool
 	var inputPath, partFilter string
 	flag.StringVar(&inputPath, "input", "input.txt", "")
 	flag.StringVar(&partFilter, "part", "", "")
@@ -35,14 +29,17 @@ func main() {
 
 	input := strings.TrimSuffix(strings.ReplaceAll(string(inputData), "\r\n", "\n"), "\n")
 
-	for _, f := range []func(string) (any, string, error){Part1, Part2} {
+	for _, f := range []func(string, *Debugger) (any, error){Part1, Part2} {
 		funcName := strings.Split(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), ".")[1]
 		if !strings.HasSuffix(funcName, partFilter) {
 			continue
 		}
 
+		debug := NewDebugBuilder(verboseDebug, fmt.Sprintf("debug-%s.txt", funcName), -1)
+		defer debug.Close()
+
 		start := time.Now()
-		result, debug, err := f(input)
+		result, err := f(input, debug)
 		duration := time.Since(start)
 
 		if err != nil {
@@ -63,43 +60,27 @@ func main() {
 			break
 		}
 
-		if debug != "" {
-			debugFile, err := os.OpenFile(fmt.Sprintf("debug-%s.txt", funcName), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0777)
-			if err != nil {
-				slog.Error("could not create or append debug file", "err", err)
-				os.Exit(1)
-			}
-			defer debugFile.Close()
-
-			_, err = debugFile.WriteString(debug)
-			if err != nil {
-				slog.Error("could not write debug", "func", funcName, "err", err)
-				break
-			}
-		}
-
+		debug.Close()
 		slog.Info("finished running part", "func", funcName, "duration", duration, "result", result)
 	}
 }
 
-func Part1(input string) (any, string, error) {
+func Part1(input string, debug *Debugger) (any, error) {
 	result := 0
-	debug := ""
 
 	for _, line := range strings.Split(input, "\n") {
 		_ = line
 	}
 
-	return result, debug, nil
+	return result, nil
 }
 
-func Part2(input string) (any, string, error) {
+func Part2(input string, debug *Debugger) (any, error) {
 	result := 0
-	debug := ""
 
 	for _, line := range strings.Split(input, "\n") {
 		_ = line
 	}
 
-	return result, debug, nil
+	return result, nil
 }
