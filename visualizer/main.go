@@ -17,6 +17,7 @@ import (
 const (
 	VisualizeStep = "==========STEP==========\n"
 	VisualizeData = "==========DATA==========\n"
+	VisualizeEnd  = "==========END==========\n"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, s := range strings.Split(debug, VisualizeStep)[1:] {
+	for _, s := range strings.Split(strings.Split(debug, VisualizeEnd)[0], VisualizeStep)[1:] {
 		s := strings.TrimSuffix(s, "\n")
 		data := StepData{Data: s}
 		if strings.Contains(s, VisualizeData) {

@@ -9,6 +9,25 @@ import (
 )
 
 const (
+	VisualizeStep = "==========STEP==========\n"
+	VisualizeData = "==========DATA==========\n"
+	VisualizeEnd  = "==========END==========\n"
+)
+
+type Numbered interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64
+}
+
+func Abs[T Numbered](n T) T {
+	if n < 0 {
+		return n - n - n
+	}
+	return n
+}
+
+const (
 	AnsiColorReset = "\033[m"
 
 	AnsiColorDarkBlack   = "\033[0;30m"
@@ -60,10 +79,11 @@ func clearScreen() {
 }
 
 type Debugger struct {
-	builder    bytes.Buffer
-	active     bool
-	filePath   string
-	writeAtLen int
+	builder      bytes.Buffer
+	active       bool
+	filePath     string
+	writeAtLen   int
+	writtenBytes int
 }
 
 func NewDebugBuilder(active bool, filePath string, writeAtMB int) *Debugger {
@@ -91,6 +111,16 @@ func (d *Debugger) WriteString(s string) {
 		_, err := d.builder.WriteString(s)
 		if err != nil {
 			panic(fmt.Errorf("could not write string to debug builder: %w", err))
+		}
+		d.writeIfOverTooLarge()
+	}
+}
+
+func (d *Debugger) WriteFormat(format string, a ...any) {
+	if d.active {
+		_, err := d.builder.WriteString(fmt.Sprintf(format, a...))
+		if err != nil {
+			panic(fmt.Errorf("could not write formatted string to debug builder: %w", err))
 		}
 		d.writeIfOverTooLarge()
 	}
@@ -126,8 +156,12 @@ func (d *Debugger) Close() {
 	}
 }
 
+func (d *Debugger) Len() int {
+	return d.builder.Len() + d.writtenBytes
+}
+
 func (d *Debugger) Flush() {
-	if d.builder.Len() > d.writeAtLen {
+	if d.builder.Len() > 0 {
 		err := d.write(os.O_CREATE | os.O_WRONLY | os.O_APPEND)
 		if err != nil {
 			panic(fmt.Errorf("could not write periodic data to file: %w", err))
@@ -147,10 +181,11 @@ func (d *Debugger) write(osFlags int) error {
 		data = bytes.ReplaceAll(data, []byte(code), nil)
 	}
 
-	_, err = file.Write(data)
+	n, err := file.Write(data)
 	if err != nil {
 		return fmt.Errorf("could not write to file: %w", err)
 	}
+	d.writtenBytes += n
 
 	d.builder.Reset()
 	return nil

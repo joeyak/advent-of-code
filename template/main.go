@@ -9,11 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	_ "embed"
 )
-
-const VisualizeStep = "==========STEP==========\n"
 
 func main() {
 	defaultInput := "input.txt"
