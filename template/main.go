@@ -13,12 +13,21 @@ import (
 	_ "embed"
 )
 
+const VisualizeStep = "==========STEP==========\n"
+
 func main() {
-	var verboseDebug bool
+	defaultInput := "input.txt"
+	defaultPart := ""
+
+	// defaultInput = "input-example-1.txt"
+	// defaultPart = "1"
+
+	var verboseDebug, outputFile bool
 	var inputPath, partFilter string
-	flag.StringVar(&inputPath, "input", "input.txt", "")
-	flag.StringVar(&partFilter, "part", "", "")
+	flag.StringVar(&inputPath, "input", defaultInput, "")
+	flag.StringVar(&partFilter, "part", defaultPart, "")
 	flag.BoolVar(&verboseDebug, "v", false, "verbose debug")
+	flag.BoolVar(&outputFile, "o", false, "write output file")
 	flag.Parse()
 
 	inputData, err := os.ReadFile(inputPath)
@@ -47,17 +56,19 @@ func main() {
 			break
 		}
 
-		file, err := os.OpenFile(fmt.Sprintf("output-%s.txt", funcName), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
-		if err != nil {
-			slog.Error("could not create or append output file", "err", err)
-			os.Exit(1)
-		}
-		defer file.Close()
+		if outputFile {
+			file, err := os.OpenFile(fmt.Sprintf("output-%s.txt", funcName), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+			if err != nil {
+				slog.Error("could not create or append output file", "err", err)
+				os.Exit(1)
+			}
+			defer file.Close()
 
-		_, err = file.WriteString(fmt.Sprintf("%v", result))
-		if err != nil {
-			slog.Error("could not write result", "func", funcName, "result", result, "err", err)
-			break
+			_, err = file.WriteString(fmt.Sprintf("%v", result))
+			if err != nil {
+				slog.Error("could not write result", "func", funcName, "result", result, "err", err)
+				break
+			}
 		}
 
 		debug.Close()

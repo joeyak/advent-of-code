@@ -96,6 +96,16 @@ func (d *Debugger) WriteString(s string) {
 	}
 }
 
+func (d *Debugger) WriteFormat(format string, a ...any) {
+	if d.active {
+		_, err := d.builder.WriteString(fmt.Sprintf(format, a...))
+		if err != nil {
+			panic(fmt.Errorf("could not write formatted string to debug builder: %w", err))
+		}
+		d.writeIfOverTooLarge()
+	}
+}
+
 func (d *Debugger) WriteFunc(f func() string) {
 	if d.active {
 		_, err := d.builder.WriteString(f())
@@ -127,7 +137,7 @@ func (d *Debugger) Close() {
 }
 
 func (d *Debugger) Flush() {
-	if d.builder.Len() > d.writeAtLen {
+	if d.builder.Len() > 0 {
 		err := d.write(os.O_CREATE | os.O_WRONLY | os.O_APPEND)
 		if err != nil {
 			panic(fmt.Errorf("could not write periodic data to file: %w", err))
