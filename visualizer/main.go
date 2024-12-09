@@ -14,10 +14,15 @@ import (
 	"github.com/crazy3lf/colorconv"
 )
 
-const VisualizeStep = "==========STEP==========\n"
+const (
+	VisualizeStep = "==========STEP==========\n"
+	VisualizeData = "==========DATA==========\n"
+)
 
 func main() {
 	var args struct {
+		Year             int           `arg:"positional"`
+		Day              int           `arg:"positional"`
 		Part             int           `arg:"positional" default:"1"`
 		AutoPlay         bool          `arg:"-a"`
 		DebugHeat        bool          `arg:"-h"`
@@ -33,7 +38,7 @@ func main() {
 		DebugHeat:   args.DebugHeat,
 	}
 
-	debugData, err := os.ReadFile(fmt.Sprintf("../debug-Part%d.txt", args.Part))
+	debugData, err := os.ReadFile(fmt.Sprintf("../%d/day%d/debug-Part%d.txt", args.Year, args.Day, args.Part))
 	if err != nil {
 		slog.Error("could not read debug file", "err", err)
 		os.Exit(1)
@@ -46,7 +51,14 @@ func main() {
 	}
 
 	for _, s := range strings.Split(debug, VisualizeStep)[1:] {
-		model.Steps = append(model.Steps, strings.TrimSuffix(s, "\n"))
+		s := strings.TrimSuffix(s, "\n")
+		data := StepData{Data: s}
+		if strings.Contains(s, VisualizeData) {
+			parts := strings.Split(s, VisualizeData)
+			data.Meta = strings.TrimSuffix(parts[0], "\n")
+			data.Data = strings.TrimSuffix(parts[1], "\n")
+		}
+		model.Steps = append(model.Steps, data)
 	}
 
 	p := tea.NewProgram(model)
@@ -66,13 +78,18 @@ func main() {
 
 type Tick tea.Msg
 
+type StepData struct {
+	Data string
+	Meta string
+}
+
 type Model struct {
 	Paused      bool
 	DebugHeat   bool
 	StepMod     int
 	CurrentStep int
 
-	Steps []string
+	Steps []StepData
 }
 
 func (m Model) Init() tea.Cmd {
@@ -81,10 +98,11 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	foreward := func() {
-		m.CurrentStep = min(m.CurrentStep+m.StepMod, len(m.Steps))
-	}
-	backward := func() {
-		m.CurrentStep = max(m.CurrentStep-m.StepMod, 1)
+		maxStep := len(m.Steps)
+		m.CurrentStep = min(m.CurrentStep+m.StepMod, maxStep)
+		if m.CurrentStep == maxStep {
+			m.Paused = true
+		}
 	}
 
 	switch msg := msg.(type) {
@@ -93,7 +111,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "left":
-			backward()
+			m.CurrentStep = max(m.CurrentStep-m.StepMod, 1)
 		case "right":
 			foreward()
 		case "ctrl+left":
@@ -120,14 +138,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.StepMod -= 10
 			}
-		}
-	case tea.MouseMsg:
-		if msg.Action == tea.MouseActionRelease {
-			switch msg.Button {
-			case tea.MouseButtonLeft:
-				foreward()
-			case tea.MouseButtonRight:
-				backward()
+			if m.StepMod < 1 {
+				m.StepMod = 1
 			}
 		}
 	case Tick:
@@ -147,14 +159,15 @@ func (m Model) View() string {
 		headerStyle.Render(fmt.Sprintf("Step Mod: %d", m.StepMod)),
 	)
 
-	current := []byte(m.Steps[m.CurrentStep-1])
+	currentStep := m.Steps[m.CurrentStep-1]
+	current := []byte(currentStep.Data)
 	heatmap := slices.Repeat([]int{0}, len(current))
 
 	maxHeat := 0
 	steps := m.Steps[max(m.CurrentStep-max(20, m.StepMod), 0):min(m.CurrentStep-1, len(m.Steps))]
 	for _, step := range steps {
 		for heatIdx, r := range current {
-			if r != step[heatIdx] {
+			if r != step.Data[heatIdx] {
 				heatmap[heatIdx]++
 				maxHeat = max(heatmap[heatIdx], maxHeat)
 			}
@@ -194,11 +207,13 @@ func (m Model) View() string {
 
 	if m.DebugHeat {
 		result = lipgloss.JoinHorizontal(lipgloss.Center, result, heatDebug)
+	} else if currentStep.Meta != "" {
+		result = lipgloss.JoinHorizontal(lipgloss.Top, result, lipgloss.NewStyle().Padding(0, 1).Render(currentStep.Meta))
 	}
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.DoubleBorder()).
 		Padding(0, 1).
 		MarginBottom(1).
-		Render(lipgloss.JoinVertical(lipgloss.Center, header, result))
+		Render(lipgloss.JoinVertical(lipgloss.Left, header, result))
 }
