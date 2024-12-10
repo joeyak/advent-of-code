@@ -119,6 +119,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.CurrentStep = 1
 		case "ctrl+right":
 			m.CurrentStep = len(m.Steps)
+		case "alt+1":
+			m.StepMod = 1
+		case "alt+2":
+			m.StepMod = 2
+		case "alt+3":
+			m.StepMod = 3
+		case "alt+4":
+			m.StepMod = 4
+		case "alt+5":
+			m.StepMod = 5
+		case "alt+6":
+			m.StepMod = 6
+		case "alt+7":
+			m.StepMod = 7
+		case "alt+8":
+			m.StepMod = 8
+		case "alt+9":
+			m.StepMod = 9
 		case " ":
 			m.Paused = !m.Paused
 		case "h":
