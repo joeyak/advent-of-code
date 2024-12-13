@@ -3,12 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"iter"
 	"log/slog"
 	"os"
 	"reflect"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 )
@@ -17,7 +15,7 @@ func main() {
 	defaultInput := "input.txt"
 	defaultPart := ""
 
-	// defaultInput = "input-example-1.txt"
+	// defaultInput = "input-example-3.txt"
 	// defaultPart = "1"
 
 	var verboseDebug bool
@@ -70,88 +68,99 @@ func Part1(input string, debug *Debugger) (any, error) {
 	lines := strings.Split(input, "\n")
 	height := len(lines)
 	width := len(lines[0])
+
 	field := make([][]*Crop, height)
 	for row, line := range lines {
 		field[row] = make([]*Crop, width)
 		for col, r := range line {
-			field[row][col] = &Crop{Rune: r}
+			field[row][col] = &Crop{Rune: r, Region: -1}
 		}
 	}
 
-	debug.WriteFunc(func() string {
-		return "Orig" + strings.Repeat(" ", max(1, width-2)) + "Sides" + strings.Repeat(" ", max(1, width-3)) + "Region\n"
-	})
-
-	regions := map[int][]*Crop{}
 	regionCounter := 0
+	regions := map[int][]*Crop{}
 	for row := range field {
-		for dirIdx, compares := range [][]any{{slices.Backward[[]*Crop], slices.Backward[[][]int]}, {slices.All[[]*Crop], slices.All[[][]int]}} {
-			dirField := compares[0].(func([]*Crop) iter.Seq2[int, *Crop])
-			dirInt := compares[1].(func([][]int) iter.Seq2[int, []int])
-			for col, crop := range dirField(field[row]) {
-				for _, pos := range dirInt([][]int{{-1, 0}, {0, -1}, {0, +1}, {+1, 0}}) {
-					checkRow, checkCol := row+pos[0], col+pos[1]
-					if checkRow < 0 || checkRow >= height || checkCol < 0 || checkCol >= width {
-						if dirIdx == 1 {
-							crop.Sides++
-						}
-						continue
-					}
-
-					check := field[checkRow][checkCol]
-					if crop.Region == 0 && check.Region != 0 && crop.Rune == check.Rune {
-						crop.Region = check.Region
-						continue
-					}
-
-					if dirIdx == 1 {
-						if crop.Rune != check.Rune {
-							crop.Sides++
-						}
-					}
+		for col := range field[row] {
+			if field[row][col].Region == -1 {
+				regions[regionCounter] = pathCrops(field, Hash[*Crop]{}, row, col, width, height)
+				for _, crop := range regions[regionCounter] {
+					crop.Region = regionCounter
 				}
 
-				if dirIdx == 1 {
-					if crop.Region == 0 {
-						regionCounter++
-						crop.Region = regionCounter
-					}
+				debug.WriteFunc(func() string {
+					s := VisualizeStep + "Orig" + strings.Repeat(" ", max(1, width-2)) + "Region" + strings.Repeat(" ", max(1, width-4)) + "Sides\n"
+					for _, row := range field {
+						ss := []rune(strings.Repeat(" ", width*3+4))
 
-					regions[crop.Region] = append(regions[crop.Region], crop)
-				}
+						for col, crop := range row {
+							if crop.Region == -1 {
+								ss[col] = '.'
+								ss[col+width+2] = '.'
+								ss[col+width*2+4] = '.'
+							} else {
+								ss[col] = crop.Rune
+								ss[col+width+2] = rune(crop.Region + 48)
+								ss[col+width*2+4] = rune(crop.Sides + 48)
+							}
+						}
+
+						s += string(ss) + "\n"
+					}
+					return s
+				})
+				debug.Flush()
+				regionCounter++
 			}
 		}
-
-		debug.WriteFunc(func() string {
-			s := append([]rune(strings.Repeat(" ", width*3+4)), '\n')
-
-			for col, crop := range field[row] {
-				s[col] = crop.Rune
-				s[col+width+2] = rune(crop.Sides + 48)
-				s[col+width*2+4] = rune(crop.Region + 48)
-			}
-
-			return string(s)
-		})
-		debug.Flush()
 	}
 
-	debug.WriteString("\n")
+	debug.WriteString(VisualizeEnd)
 
-	for region := 1; region <= regionCounter; region++ {
+	for region := 0; region < len(regions); region++ {
 		crops := regions[region]
 
 		area := len(crops)
 		perimeter := 0
-		for i := range crops {
-			perimeter += crops[i].Sides
+		var r rune
+		for _, crop := range crops {
+			perimeter += crop.Sides
+			r = crop.Rune
 		}
 		result += area * perimeter
 
-		debug.WriteFormat("[%d|%s] a(%d) + p(%d) = c(%d) => %d\n", region, string(crops[0].Rune), area, perimeter, area*perimeter, result)
+		debug.WriteFormat("[%d|%s] a(%d) + p(%d) = c(%d) => %d\n", region, string(r), area, perimeter, area*perimeter, result)
 	}
 
 	return result, nil
+}
+
+func pathCrops(field [][]*Crop, checked Hash[*Crop], row, col, width, height int) []*Crop {
+	crop := field[row][col]
+
+	checked.Add(crop)
+	crops := []*Crop{crop}
+
+	for _, dir := range [][]int{{-1, 0}, {0, -1}, {1, 0}, {0, 1}} {
+		cRow, cCol := row+dir[0], col+dir[1]
+		if cRow < 0 || cRow >= height || cCol < 0 || cCol >= width {
+			crop.Sides++
+			continue
+		}
+
+		checkCrop := field[cRow][cCol]
+		if checked.Has(checkCrop) {
+			continue
+		}
+
+		if crop.Rune != checkCrop.Rune {
+			crop.Sides++
+			continue
+		}
+
+		crops = append(crops, pathCrops(field, checked, cRow, cCol, width, height)...)
+	}
+
+	return crops
 }
 
 func Part2(input string, debug *Debugger) (any, error) {

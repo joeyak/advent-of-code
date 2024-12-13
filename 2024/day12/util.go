@@ -196,3 +196,8 @@ type Hash[T comparable] map[T]struct{}
 func (h Hash[T]) Add(k T) {
 	h[k] = struct{}{}
 }
+
+func (h Hash[T]) Has(k T) bool {
+	_, ok := h[k]
+	return ok
+}
