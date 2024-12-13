@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+var veryVerbose bool
+
 func main() {
 	defaultInput := "input.txt"
 	defaultPart := ""
@@ -23,7 +25,12 @@ func main() {
 	flag.StringVar(&inputPath, "input", defaultInput, "")
 	flag.StringVar(&partFilter, "part", defaultPart, "")
 	flag.BoolVar(&verboseDebug, "v", false, "verbose debug")
+	flag.BoolVar(&veryVerbose, "vv", false, "very verbose debug")
 	flag.Parse()
+
+	if veryVerbose {
+		verboseDebug = true
+	}
 
 	inputData, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -56,10 +63,32 @@ func main() {
 	}
 }
 
+const (
+	Up Side = 1 << iota
+	Down
+	Left
+	Right
+)
+
+type Side byte
+
+func (s Side) Count() int {
+	c := 0
+
+	for _, dir := range []Side{Up, Down, Left, Right} {
+		if s&dir != 0 {
+			c++
+		}
+	}
+
+	return c
+}
+
 type Crop struct {
-	Region int
-	Sides  int
-	Rune   rune
+	Row, Col int
+	Region   int
+	Sides    Side
+	Rune     rune
 }
 
 func Part1(input string, debug *Debugger) (any, error) {
@@ -73,8 +102,38 @@ func Part1(input string, debug *Debugger) (any, error) {
 	for row, line := range lines {
 		field[row] = make([]*Crop, width)
 		for col, r := range line {
-			field[row][col] = &Crop{Rune: r, Region: -1}
+			field[row][col] = &Crop{
+				Row:    row,
+				Col:    col,
+				Rune:   r,
+				Region: -1,
+			}
 		}
+	}
+
+	fireDebug := func() {
+		debug.WriteFunc(func() string {
+			s := VisualizeStep + "Orig" + strings.Repeat(" ", max(1, width-2)) + "Region" + strings.Repeat(" ", max(1, width-4)) + "Sides\n"
+			for _, row := range field {
+				ss := []rune(strings.Repeat(" ", width*3+4))
+
+				for col, crop := range row {
+					if crop.Region == -1 {
+						ss[col] = '.'
+						ss[col+width+2] = '.'
+						ss[col+width*2+4] = '.'
+					} else {
+						ss[col] = crop.Rune
+						ss[col+width+2] = rune(crop.Region + 48)
+						ss[col+width*2+4] = rune(crop.Sides.Count() + 48)
+					}
+				}
+
+				s += string(ss) + "\n"
+			}
+			return s
+		})
+		debug.Flush()
 	}
 
 	regionCounter := 0
@@ -87,31 +146,17 @@ func Part1(input string, debug *Debugger) (any, error) {
 					crop.Region = regionCounter
 				}
 
-				debug.WriteFunc(func() string {
-					s := VisualizeStep + "Orig" + strings.Repeat(" ", max(1, width-2)) + "Region" + strings.Repeat(" ", max(1, width-4)) + "Sides\n"
-					for _, row := range field {
-						ss := []rune(strings.Repeat(" ", width*3+4))
+				if veryVerbose {
+					fireDebug()
+				}
 
-						for col, crop := range row {
-							if crop.Region == -1 {
-								ss[col] = '.'
-								ss[col+width+2] = '.'
-								ss[col+width*2+4] = '.'
-							} else {
-								ss[col] = crop.Rune
-								ss[col+width+2] = rune(crop.Region + 48)
-								ss[col+width*2+4] = rune(crop.Sides + 48)
-							}
-						}
-
-						s += string(ss) + "\n"
-					}
-					return s
-				})
-				debug.Flush()
 				regionCounter++
 			}
 		}
+	}
+
+	if !veryVerbose {
+		fireDebug()
 	}
 
 	debug.WriteString(VisualizeEnd)
@@ -121,17 +166,20 @@ func Part1(input string, debug *Debugger) (any, error) {
 
 		area := len(crops)
 		perimeter := 0
-		var r rune
 		for _, crop := range crops {
-			perimeter += crop.Sides
-			r = crop.Rune
+			perimeter += crop.Sides.Count()
 		}
 		result += area * perimeter
 
-		debug.WriteFormat("[%d|%s] a(%d) + p(%d) = c(%d) => %d\n", region, string(r), area, perimeter, area*perimeter, result)
+		debug.WriteFormat("[%d|%s] a(%d) + p(%d) = c(%d) => %d\n", region, string(crops[0].Rune), area, perimeter, area*perimeter, result)
 	}
 
 	return result, nil
+}
+
+type Direction struct {
+	Side     Side
+	Row, Col int
 }
 
 func pathCrops(field [][]*Crop, checked Hash[*Crop], row, col, width, height int) []*Crop {
@@ -140,10 +188,15 @@ func pathCrops(field [][]*Crop, checked Hash[*Crop], row, col, width, height int
 	checked.Add(crop)
 	crops := []*Crop{crop}
 
-	for _, dir := range [][]int{{-1, 0}, {0, -1}, {1, 0}, {0, 1}} {
-		cRow, cCol := row+dir[0], col+dir[1]
+	for _, dir := range []Direction{
+		{Side: Up, Row: -1, Col: 0},
+		{Side: Left, Row: 0, Col: -1},
+		{Side: Down, Row: 1, Col: 0},
+		{Side: Right, Row: 0, Col: 1},
+	} {
+		cRow, cCol := row+dir.Row, col+dir.Col
 		if cRow < 0 || cRow >= height || cCol < 0 || cCol >= width {
-			crop.Sides++
+			crop.Sides |= dir.Side
 			continue
 		}
 
@@ -153,7 +206,7 @@ func pathCrops(field [][]*Crop, checked Hash[*Crop], row, col, width, height int
 		}
 
 		if crop.Rune != checkCrop.Rune {
-			crop.Sides++
+			crop.Sides |= dir.Side
 			continue
 		}
 
@@ -166,9 +219,115 @@ func pathCrops(field [][]*Crop, checked Hash[*Crop], row, col, width, height int
 func Part2(input string, debug *Debugger) (any, error) {
 	result := 0
 
-	for _, line := range strings.Split(input, "\n") {
-		_ = line
+	lines := strings.Split(input, "\n")
+	height := len(lines)
+	width := len(lines[0])
+
+	field := make([][]*Crop, height)
+	for row, line := range lines {
+		field[row] = make([]*Crop, width)
+		for col, r := range line {
+			field[row][col] = &Crop{
+				Row:    row,
+				Col:    col,
+				Rune:   r,
+				Region: -1,
+			}
+		}
+	}
+
+	fireDebug := func() {
+		debug.WriteFunc(func() string {
+			s := VisualizeStep + "Orig" + strings.Repeat(" ", max(1, width-2)) + "Region\n"
+			for _, row := range field {
+				ss := []rune(strings.Repeat(" ", width*2+2))
+
+				for col, crop := range row {
+					if crop.Region == -1 {
+						ss[col] = '.'
+						ss[col+width+2] = '.'
+					} else {
+						ss[col] = crop.Rune
+						ss[col+width+2] = rune(crop.Region + 48)
+					}
+				}
+
+				s += string(ss) + "\n"
+			}
+			return s
+		})
+		debug.Flush()
+	}
+
+	regionCounter := 0
+	regions := map[int][]*Crop{}
+	for row := range field {
+		for col := range field[row] {
+			if field[row][col].Region == -1 {
+				regions[regionCounter] = pathCrops(field, Hash[*Crop]{}, row, col, width, height)
+				for _, crop := range regions[regionCounter] {
+					crop.Region = regionCounter
+				}
+
+				if veryVerbose {
+					fireDebug()
+				}
+
+				regionCounter++
+			}
+		}
+	}
+
+	if !veryVerbose {
+		fireDebug()
+	}
+
+	debug.WriteString(VisualizeEnd)
+
+	for region := 0; region < len(regions); region++ {
+		crops := regions[region]
+
+		area := len(crops)
+		perimeter := bulkPerimeterFromRegion(crops, width, height)
+		result += area * perimeter
+
+		debug.WriteFormat("[%d|%s] a(%d) + p(%d) = c(%d) => %d\n", region, string(crops[0].Rune), area, perimeter, area*perimeter, result)
 	}
 
 	return result, nil
+}
+
+func bulkPerimeterFromRegion(cropList []*Crop, width, height int) int {
+	_ = cropList
+	_ = width
+	_ = height
+	return 0
+	// keyMod := int(math.Pow(10, math.Log10(float64(width))+1))
+	// cropKey := func(row, col int) int {
+	// 	return row*keyMod+col
+	// }
+
+	// crops := map[int]*Crop{}
+	// for _, crop := range cropList {
+	// 	crops[cropKey(crop.Row, crop.Col)] = crop
+	// }
+
+	// sides := 0
+	// inFence := false
+	// checked := 0
+
+	// // horizontal fences
+	// var upSides, downSides int
+	// for row := 0; row < height && checked < height; row++ {
+	// 	for col := 0; col < width-1 && checked < width; col++ {
+	// 		crop, ok := crops[cropKey(row, col)]
+	// 		if !ok {
+	// 			inFence =false
+	// 			continue
+	// 		}
+
+	// 	}
+	// }
+
+	// return sides
 }
