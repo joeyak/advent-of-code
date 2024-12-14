@@ -6,6 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"reflect"
+	"runtime"
+	"strings"
+	"time"
 )
 
 const (
@@ -13,6 +17,46 @@ const (
 	VisualizeData = "==========DATA==========\n"
 	VisualizeEnd  = "==========END==========\n"
 )
+
+type Args struct {
+	Input      string
+	PartFilter string
+	Verbose    bool
+}
+
+func main() {
+	args := parseArgs()
+
+	inputData, err := os.ReadFile(args.Input)
+	if err != nil {
+		slog.Error("could not read file", "path", args.Input, "err", err)
+		os.Exit(1)
+	}
+
+	input := strings.TrimSuffix(strings.ReplaceAll(string(inputData), "\r\n", "\n"), "\n")
+
+	for _, f := range []func(string, *Debugger) (any, error){Part1, Part2} {
+		funcName := strings.Split(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), ".")[1]
+		if !strings.HasSuffix(funcName, args.PartFilter) {
+			continue
+		}
+
+		debug := NewDebugBuilder(args.Verbose, fmt.Sprintf("debug-%s.txt", funcName), -1)
+		defer debug.Close()
+
+		start := time.Now()
+		result, err := f(input, debug)
+		duration := time.Since(start)
+
+		if err != nil {
+			slog.Error("could not run part", "func", funcName, "err", err)
+			break
+		}
+
+		debug.Close()
+		slog.Info("finished running part", "func", funcName, "duration", duration, "result", result)
+	}
+}
 
 type Numbered interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
